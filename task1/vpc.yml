@@ -1,0 +1,254 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: VPC, IGW, Subnet, NGW, ROUTE TABLE
+
+Parameters:
+  VPCCIDR:
+    Type: String
+    Default: "10.0.0.0/16"
+
+  MyPrefix:
+    Type: String
+
+  PubSubnetCIDRa:
+    Type: String
+    Default: "10.0.1.0/24"
+
+  PubSubnetCIDRc:
+    Type: String
+    Default: "10.0.2.0/24"
+
+  PriSubnetCIDRa:
+    Type: String
+    Default: "10.0.10.0/24"
+
+  PriSubnetCIDRc:
+    Type: String
+    Default: "10.0.20.0/24"
+
+Resources:
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub "vpc-${MyPrefix}"
+
+  IGW:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-igw"
+
+  IGWAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref myVPC
+
+  PubSubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PubSubnetCIDRa
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-public-subnet-a"
+
+  PubSubnetC:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: !Ref PubSubnetCIDRc
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-public-subnet-c"
+
+  PriSubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref PriSubnetCIDRa
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-private-subnet-a"
+
+  PriSubnetC:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: !Ref PriSubnetCIDRc
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-private-subnet-c"
+
+  NATGatewayA:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NATGatewayAEIP.AllocationId
+      SubnetId: !Ref PubSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-ngw-a"
+
+  NATGatewayAEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+
+  NATGatewayC:
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId: !GetAtt NATGatewayCEIP.AllocationId
+      SubnetId: !Ref PubSubnetC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-ngw-c"
+
+  NATGatewayCEIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+
+  PubRouteTableA:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-public-route-a"
+
+  PubRouteTableC:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-public-route-c"
+
+  PriRouteTableA:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-private-route-a"
+
+  PriRouteTableC:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${MyPrefix}-private-route-c"
+
+  PubRouteA:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PubRouteTableA
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref IGW
+
+  PubRouteC:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PubRouteTableC
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref IGW
+
+  PriRouteA:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PriRouteTableA
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NATGatewayA
+
+  PriRouteC:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PriRouteTableC
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NATGatewayC
+
+  PubSubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PubSubnetA
+      RouteTableId: !Ref PubRouteTableA
+
+  PubSubnetCRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PubSubnetC
+      RouteTableId: !Ref PubRouteTableC
+
+  PriSubnetARouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PriSubnetA
+      RouteTableId: !Ref PriRouteTableA
+
+  PriSubnetCRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PriSubnetC
+      RouteTableId: !Ref PriRouteTableC
+
+Outputs:
+  VPC:
+    Value: !Ref myVPC
+    Export:
+      Name: !Sub "${MyPrefix}-vpc"
+
+  VPCCIDR:
+    Value: !Ref VPCCIDR
+    Export:
+      Name: !Sub "${MyPrefix}-vpc-cidr"
+
+  PubSubnetA:
+    Value: !Ref PubSubnetA
+    Export:
+      Name: !Sub "${MyPrefix}-public-subnet-a"
+
+  PubSubnetACIDR:
+    Value: !Ref PubSubnetCIDRa
+    Export:
+      Name: !Sub "${MyPrefix}-public-subnet-a-cidr"
+
+  PubSubnetC:
+    Value: !Ref PubSubnetC
+    Export:
+      Name: !Sub "${MyPrefix}-public-subnet-c"
+
+  PubSubnetCCIDR:
+    Value: !Ref PubSubnetCIDRc
+    Export:
+      Name: !Sub "${MyPrefix}-public-subnet-c-cidr"
+
+  PriSubnetA:
+    Value: !Ref PriSubnetA
+    Export:
+      Name: !Sub "${MyPrefix}-private-subnet-a"
+
+  PriSubnetACIDR:
+    Value: !Ref PriSubnetCIDRa
+    Export:
+      Name: !Sub "${MyPrefix}-private-subnet-a-cidr"
+
+  PriSubnetC:
+    Value: !Ref PriSubnetC
+    Export:
+      Name: !Sub "${MyPrefix}-private-subnet-c"
+
+  PrivateSubnetCCIDR:
+    Value: !Ref PriSubnetCIDRc
+    Export:
+      Name: !Sub "${MyPrefix}-private-subnet-c-cidr"
